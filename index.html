@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tesla Solar Clock - Precision Edition</title>
+    <style>
+        :root {
+            --primary: #0f0;
+            --secondary: #0a0;
+            --background: #000;
+            --card-bg: rgba(0, 255, 0, 0.05);
+            --border: #0f0;
+        }
+        
+        body { 
+            background: var(--background); 
+            color: var(--primary); 
+            font-family: 'Courier New', monospace; 
+            text-align: center; 
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        #clock { 
+            font-size: 4em; 
+            margin: 20px 0;
+            text-shadow: 0 0 10px var(--primary);
+            letter-spacing: 2px;
+        }
+        
+        .card {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--card-bg);
+            text-align: left;
+        }
+        
+        h1, h2, h3 {
+            text-align: center;
+            margin-top: 0;
+        }
+        
+        input, select, button {
+            background: var(--background);
+            color: var(--primary);
+            border: 1px solid var(--border);
+            padding: 10px;
+            margin: 5px;
+            font-family: monospace;
+            border-radius: 5px;
+            width: calc(100% - 24px);
+            max-width: 300px;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            box-shadow: 0 0 10px var(--primary);
+        }
+        
+        button {
+            cursor: pointer;
+            transition: all 0.3s;
+            width: auto;
+        }
+        
+        button:hover {
+            background: var(--primary);
+            color: var(--background);
+        }
+        
+        .alarm-active {
+            animation: pulse 1s infinite;
+            color: #ff4444;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .status {
+            margin: 10px 0;
+            font-size: 1.2em;
+            text-align: center;
+        }
+        
+        .coordinates {
+            font-size: 0.9em;
+            color: var(--secondary);
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .flex-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .flex-item {
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .info-text {
+            font-size: 0.9em;
+            color: var(--secondary);
+            margin: 5px 0;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        #countdown {
+            font-size: 1.5em;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .accuracy-note {
+            font-size: 0.8em;
+            color: var(--secondary);
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .preset-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Tesla Solar Clock - Precision Edition</h1>
+        
+        <div class="coordinates" id="coordinates">
+            Acquiring GPS...
+        </div>
+        
+        <div id="clock">--:--:--</div>
+        
+        <div class="card">
+            <h2>📍 Location Settings</h2>
+            <div class="flex-row">
+                <div class="flex-item">
+                    <label for="latitude">Latitude:</label>
+                    <input type="number" id="latitude" step="any" placeholder="e.g., 19.44264" value="19.442640">
+                </div>
+                <div class="flex-item">
+                    <label for="longitude">Longitude:</label>
+                    <input type="number" id="longitude" step="any" placeholder="e.g., -154.944005" value="-154.944005">
+                </div>
+                <div class="flex-item">
+                    <label for="elevation">Elevation (m):</label>
+                    <input type="number" id="elevation" value="330" step="any">
+                </div>
+            </div>
+            <div class="flex-row">
+                <div class="preset-buttons">
+                    <button onclick="useCurrentLocation()">Use Current Location</button>
+                    <button onclick="useCustomCoordinates()">Use Custom Coordinates</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>⏰ Solar Alarm</h2>
+            
+            <div class="flex-row">
+                <div class="flex-item">
+                    <label>Alarm Time (HH:MM:SS):</label>
+                    <input type="number" id="alarmHour" min="0" max="23" placeholder="HH" value="19">
+                    <input type="number" id="alarmMinute" min="0" max="59" placeholder="MM" value="34">
+                    <input type="number" id="alarmSecond" min="0" max="59" placeholder="SS" value="39">
+                </div>
+            </div>
+            
+            <div class="flex-row">
+                <button onclick="setAlarm()">Set Alarm</button>
+                <button onclick="clearAlarm()">Clear Alarm</button>
+                <button onclick="testAlarm()">Test Alarm</button>
+            </div>
+            
+            <div class="status" id="alarmStatus">
+                No alarm set
+            </div>
+            
+            <div id="countdown">
+                --:--:--
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📅 Date & Time Settings</h2>
+            <div class="flex-row">
+                <div class="flex-item">
+                    <label for="customDate">Custom Date:</label>
+                    <input type="date" id="customDate">
+                </div>
+                <div class="flex-item">
+                    <label for="customTime">Custom Time (HST):</label>
+                    <input type="time" id="customTime" step="1">
+                </div>
+            </div>
+            <div class="flex-row">
+                <button onclick="useCustomDateTime()">Use Custom Date/Time</button>
+                <button onclick="useCurrentDateTime()">Use Current Date/Time</button>
+            </div>
+            <div class="info-text">
+                Current mode: <span id="timeMode">Real-time</span>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>🔍 Solar Time Details</h2>
+            <div id="solarDetails">
+                Equation of Time: -- minutes<br>
+                Longitudinal Correction: -- minutes<br>
+                Elevation Correction: -- seconds<br>
+                Atmospheric Refraction: -- seconds<br>
+                Total Offset: -- seconds
+            </div>
+        </div>
+        
+        <div class="accuracy-note">
+            Precision solar time calculation with elevation and atmospheric refraction corrections
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        let config = {
+            lon: null,
+            lat: null,
+            elevation: 330,
+            useCustomTime: false,
+            customDate: null,
+            alarmTime: null,
+            alarmActive: false,
+            alarmTimeout: null
+        };
+        
+        // More precise EoT coefficients (Meeus Astronomical Algorithms)
+        const EOT_COEFFS = [
+            [0, 0, 0, 0, 1],
+            [-107.5, -108.9, -106.9, -106.3, -106.9],
+            [596.1, 596.2, 596.1, 596.2, 596.2],
+            [-4.4, -4.4, -4.4, -4.4, -4.4],
+            [12.0, 12.0, 12.0, 12.0, 12.0],
+            [-428.9, -429.8, -428.2, -427.4, -428.2],
+            [-2.1, -2.1, -2.1, -2.1, -2.1],
+            [19.8, 19.8, 19.8, 19.8, 19.8],
+            [-3.7, -3.7, -3.7, -3.7, -3.7]
+        ];
+        
+        // Initialize
+        function init() {
+            // Set up date inputs with current date
+            const now = new Date();
+            document.getElementById('customDate').valueAsDate = now;
+            
+            // Set up time input with current HST time (UTC-10)
+            const hstTime = new Date(now.getTime() - (10 * 60 * 60 * 1000));
+            document.getElementById('customTime').value = 
+                hstTime.getUTCHours().toString().padStart(2, '0') + ':' + 
+                hstTime.getUTCMinutes().toString().padStart(2, '0');
+            
+            // Initialize with custom coordinates from input fields
+            useCustomCoordinates();
+            
+            // Start GPS
+            getLocation();
+            
+            // Start clock update
+            setInterval(updateDisplay, 1000);
+        }
+        
+        // More precise Equation of Time calculation (Meeus algorithm)
+        function preciseEquationOfTime(date) {
+            const year = date.getUTCFullYear();
+            const denom = isLeapYear(year) ? 366 : 365;
+            const doy = dayOfYear(date);
+            const hourFrac = (date.getUTCHours() - 12) / 24;
+            const gamma = (2 * Math.PI / denom) * (doy - 1 + hourFrac);
+            
+            // More precise calculation using Meeus coefficients
+            let eot = 0;
+            for (let i = 0; i < EOT_COEFFS.length; i++) {
+                const coeffs = EOT_COEFFS[i];
+                const j = Math.min(4, year - 2000);
+                eot += coeffs[j] * Math.sin(i * gamma);
+            }
+            
+            return eot / 60; // Convert to minutes
+        }
+        
+        // Atmospheric refraction correction (Saemundsson formula)
+        function atmosphericRefraction(solarAltitude, elevation) {
+            if (solarAltitude < -0.5) return 0; // No refraction when sun is well below horizon
+            
+            // Convert altitude to degrees
+            const altDeg = solarAltitude * (180 / Math.PI);
+            
+            // Pressure correction for elevation (simplified)
+            const pressureFactor = Math.exp(-elevation / 8430);
+            
+            // Saemundsson formula for refraction (in degrees)
+            let refraction = 0;
+            if (altDeg > 15) {
+                refraction = 0.00452 * pressureFactor * 3.5156 / Math.tan(altDeg * Math.PI / 180);
+            } else if (altDeg > -0.5) {
+                refraction = pressureFactor * (0.1594 + 0.0196 * altDeg + 0.00002 * altDeg * altDeg) / 
+                            (1 + 0.505 * altDeg + 0.0845 * altDeg * altDeg);
+            }
+            
+            // Convert to time (seconds) - approximation based on solar motion
+            return refraction * 240; // Rough conversion: 1° ≈ 4 minutes = 240 seconds
+        }
+        
+        // Solar altitude calculation (simplified)
+        function calculateSolarAltitude(date, lat, lon) {
+            // Simplified calculation - in a real implementation, this would be more complex
+            const year = date.getUTCFullYear();
+            const denom = isLeapYear(year) ? 366 : 365;
+            const doy = dayOfYear(date);
+            const hourFrac = (date.getUTCHours() + date.getUTCMinutes()/60 + date.getUTCSeconds()/3600);
+            
+            // Solar declination approximation
+            const declination = 0.4095 * Math.sin(2 * Math.PI / 365 * (doy - 81));
+            
+            // Hour angle
+            const timeOffset = (lon / 15) * 60; // minutes
+            const solarTime = hourFrac + timeOffset/60;
+            const hourAngle = (solarTime - 12) * 15 * (Math.PI / 180);
+            
+            // Solar altitude
+            const latRad = lat * (Math.PI / 180);
+            const sinAlt = Math.sin(latRad) * Math.sin(declination) + 
+                          Math.cos(latRad) * Math.cos(declination) * Math.cos(hourAngle);
+            
+            return Math.asin(sinAlt);
+        }
+        
+        // Enhanced solar time calculation with all corrections
+        function apparentSolarTime(lat, lon, elevation, date) {
+            if (!lon || !lat) return { hour: '--', min: '--', sec: '--' };
+            
+            // Calculate components
+            const eqtime = preciseEquationOfTime(date);
+            const lonCorrection = (lon / 15) * 60; // minutes
+            
+            // Calculate solar altitude for refraction correction
+            const solarAlt = calculateSolarAltitude(date, lat, lon);
+            const refractionCorrection = atmosphericRefraction(solarAlt, elevation) / 60; // minutes
+            
+            // Elevation correction (simplified - affects apparent sunrise/sunset times)
+            const elevationCorrection = (elevation > 0) ? 
+                (0.035 * Math.sqrt(elevation)) / 60 : 0; // minutes
+            
+            let totalOffsetMin = lonCorrection + eqtime + refractionCorrection + elevationCorrection;
+            let utcTotalMin = date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60;
+            let solarTotalMin = (utcTotalMin + totalOffsetMin) % 1440;
+            
+            if (solarTotalMin < 0) solarTotalMin += 1440;
+            
+            const solarHour = Math.floor(solarTotalMin / 60);
+            const solarMin = Math.floor(solarTotalMin % 60);
+            const solarSec = Math.floor(((solarTotalMin % 60) % 1) * 60);
+            
+            // Store details for display
+            window.solarDetails = {
+                eqTime: eqtime.toFixed(4),
+                lonCorrection: lonCorrection.toFixed(4),
+                elevationCorrection: (elevationCorrection * 60).toFixed(2),
+                refractionCorrection: (refractionCorrection * 60).toFixed(2),
+                totalOffset: (totalOffsetMin * 60).toFixed(2)
+            };
+            
+            return { 
+                hour: solarHour.toString().padStart(2, '0'), 
+                min: solarMin.toString().padStart(2, '0'), 
+                sec: solarSec.toString().padStart(2, '0') 
+            };
+        }
+        
+        // Date/Time helpers
+        function isLeapYear(year) {
+            return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+        }
+        
+        function dayOfYear(date) {
+            const year = date.getUTCFullYear();
+            const start = Date.UTC(year, 0, 0);
+            const current = Date.UTC(year, date.getUTCMonth(), date.getUTCDate());
+            const diff = current - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            return Math.floor(diff / oneDay) + 1;
+        }
+        
+        // Location management
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        config.lon = position.coords.longitude;
+                        config.lat = position.coords.latitude;
+                        config.elevation = position.coords.altitude || 0;
+                        
+                        document.getElementById('coordinates').innerHTML = 
+                            `Lat: ${config.lat.toFixed(6)}, Lon: ${config.lon.toFixed(6)}, Elev: ${config.elevation.toFixed(0)}m`;
+                        
+                        document.getElementById('latitude').value = config.lat.toFixed(6);
+                        document.getElementById('longitude').value = config.lon.toFixed(6);
+                        document.getElementById('elevation').value = config.elevation.toFixed(0);
+                        
+                        setTimeout(getLocation, 30000); // Update every 30s
+                    },
+                    (error) => {
+                        console.error(`GPS Error ${error.code}: ${error.message}`);
+                        document.getElementById('coordinates').innerHTML = 
+                            'GPS unavailable. Using custom coordinates.';
+                        setTimeout(getLocation, 5000);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                document.getElementById('coordinates').innerHTML = 
+                    'Geolocation not supported. Using custom coordinates.';
+            }
+        }
+        
+        function useCurrentLocation() {
+            getLocation();
+        }
+        
+        function useCustomCoordinates() {
+            const latInput = document.getElementById('latitude').value;
+            const lonInput = document.getElementById('longitude').value;
+            const elevInput = document.getElementById('elevation').value;
+            
+            if (latInput && lonInput) {
+                config.lat = parseFloat(latInput);
+                config.lon = parseFloat(lonInput);
+                config.elevation = elevInput ? parseFloat(elevInput) : 0;
+                
+                document.getElementById('coordinates').innerHTML = 
+                    `Lat: ${config.lat}, Lon: ${config.lon}, Elev: ${config.elevation}m (Custom)`;
+            } else {
+                document.getElementById('coordinates').innerHTML = 
+                    'Please enter valid coordinates in the fields above';
+            }
+        }
+        
+        // Date/Time management
+        function useCustomDateTime() {
+            const dateStr = document.getElementById('customDate').value;
+            const timeStr = document.getElementById('customTime').value;
+            
+            if (!dateStr || !timeStr) {
+                alert('Please select both date and time');
+                return;
+            }
+            
+            // Create date in HST (UTC-10)
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            const date = new Date(dateStr);
+            date.setUTCHours(hours + 10, minutes, 0, 0); // Convert HST to UTC
+            
+            config.useCustomTime = true;
+            config.customDate = date;
+            
+            document.getElementById('timeMode').textContent = 'Custom: ' + 
+                date.toISOString().slice(0, 16).replace('T', ' ') + ' HST';
+                
+            updateDisplay();
+        }
+        
+        function useCurrentDateTime() {
+            config.useCustomTime = false;
+            document.getElementById('timeMode').textContent = 'Real-time';
+            updateDisplay();
+        }
+        
+        // Alarm functions
+        function setAlarm() {
+            const hour = parseInt(document.getElementById('alarmHour').value) || 0;
+            const minute = parseInt(document.getElementById('alarmMinute').value) || 0;
+            const second = parseInt(document.getElementById('alarmSecond').value) || 0;
+            
+            if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
+                alert('Please enter a valid alarm time (HH:MM:SS)');
+                return;
+            }
+            
+            config.alarmTime = { hour, minute, second };
+            config.alarmActive = true;
+            
+            document.getElementById('alarmStatus').innerHTML = 
+                `Alarm set for ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')} solar time`;
+            document.getElementById('alarmStatus').classList.remove('alarm-active');
+            
+            updateAlarmCountdown();
+        }
+        
+        function clearAlarm() {
+            config.alarmActive = false;
+            config.alarmTime = null;
+            
+            if (config.alarmTimeout) {
+                clearTimeout(config.alarmTimeout);
+                config.alarmTimeout = null;
+            }
+            
+            document.getElementById('alarmStatus').innerHTML = 'No alarm set';
+            document.getElementById('alarmStatus').classList.remove('alarm-active');
+            document.getElementById('countdown').innerHTML = '--:--:--';
+        }
+        
+        function testAlarm() {
+            triggerAlarm();
+        }
+        
+        function triggerAlarm() {
+            document.getElementById('alarmStatus').innerHTML = 'ALARM! ALARM! ALARM!';
+            document.getElementById('alarmStatus').classList.add('alarm-active');
+            
+            // Use native phone vibration API
+            if (navigator.vibrate) {
+                navigator.vibrate([500, 200, 500, 200, 500]);
+            }
+            
+            // Create a system notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Tesla Solar Clock Alarm', {
+                    body: 'Solar alarm triggered!',
+                    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjMDAwIi8+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjE1IiBzdHJva2U9IiMwZmYiIHN0cm9rZS13aWR0aD0iMiIvPgo8bGluZSB4MT0iMzIiIHkxPSIxNyIgeDI9IjMyIiB5Mj0iMjciIHN0cm9rZT0iIzBmZiIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxsaW5lIHgxPSIzMiIgeTE9IjM3IiB4Mj0iMzIiIHkyPSI0NyIgc3Ryb2tlPSIjMGZmIiBzdHJva2Utd2lkdGg9IjIiLz4KPGxpbmUgeDE9IjM3IiB5MT0iMzIiIHgyPSI0NyIgeTI9IjMyIiBzdHJva2U9IiMwZmYiIHN0cm9rZS13aWR0aD0iMiIvPgo8bGluZSB4MT0iMTciIHkxPSIzIiB4Mj0iMjciIHkyPSIzIiBzdHJva2U9IiMwZmYiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4K'
+                });
+            }
+            
+            // Request notification permission if not already granted
+            else if ('Notification' in window && Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification('Tesla Solar Clock Alarm', {
+                            body: 'Solar alarm triggered!',
+                            icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjMDAwIi8+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjE1IiBzdHJva2U9IiMwZmYiIHN0cm9rZS13aWR0aD0iMiIvPgo8bGluZSB4MT0iMzIiIHkxPSIxNyIgeDI9IjMyIiB5Mj0iMjciIHN0cm9rZT0iIzBmZiIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxsaW5lIHgxPSIzMiIgeTE9IjM3IiB4Mj0iMzIiIHkyPSI0NyIgc3Ryb2tlPSIjMGZmIiBzdHJva2Utd2lkdGg9IjIiLz4KPGxpbmUgeDE9IjM3IiB5MT0iMzIiIHgyPSI0NyIgeTI9IjMyIiBzdHJva2U9IiMwZmYiIHN0cm9rZS13aWR0aD0iMiIvPgo8bGluZSB4MT0iMTciIHkxPSIzIiB4Mj0iMjciIHkyPSIzIiBzdHJva2U9IiMwZmYiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4K'
+                        });
+                    }
+                });
+            }
+            
+            // Auto-clear alarm after 1 minute
+            config.alarmTimeout = setTimeout(() => {
+                clearAlarm();
+            }, 60000);
+        }
+        
+        function updateAlarmCountdown() {
+            if (!config.alarmActive || !config.alarmTime) return;
+            
+            const now = config.useCustomTime ? config.customDate : new Date();
+            const lat = parseFloat(document.getElementById('latitude').value) || config.lat;
+            const lon = parseFloat(document.getElementById('longitude').value) || config.lon;
+            const elevation = parseFloat(document.getElementById('elevation').value) || config.elevation;
+            
+            if (!lat || !lon) return;
+            
+            const solarTime = apparentSolarTime(lat, lon, elevation, now);
+            const currentSolarSec = parseInt(solarTime.hour) * 3600 + 
+                                   parseInt(solarTime.min) * 60 + 
+                                   parseInt(solarTime.sec);
+            
+            const alarmSolarSec = config.alarmTime.hour * 3600 + 
+                                config.alarmTime.minute * 60 + 
+                                config.alarmTime.second;
+            
+            let diffSec = alarmSolarSec - currentSolarSec;
+            if (diffSec < 0) diffSec += 86400; // Next day
+            
+            const hours = Math.floor(diffSec / 3600);
+            const minutes = Math.floor((diffSec % 3600) / 60);
+            const seconds = diffSec % 60;
+            
+            document.getElementById('countdown').innerHTML = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Check if alarm should trigger
+            if (diffSec <= 1 && diffSec >= 0) {
+                triggerAlarm();
+            }
+        }
+        
+        // Main display update
+        function updateDisplay() {
+            // Get current coordinates and elevation from input fields
+            const lat = parseFloat(document.getElementById('latitude').value) || config.lat;
+            const lon = parseFloat(document.getElementById('longitude').value) || config.lon;
+            const elevation = parseFloat(document.getElementById('elevation').value) || config.elevation;
+            
+            // Get current date/time
+            const now = config.useCustomTime ? config.customDate : new Date();
+            
+            // Update solar time display
+            if (lat && lon) {
+                const solar = apparentSolarTime(lat, lon, elevation, now);
+                document.getElementById('clock').innerHTML = `${solar.hour}:${solar.min}:${solar.sec}`;
+                
+                // Update solar details
+                if (window.solarDetails) {
+                    document.getElementById('solarDetails').innerHTML = 
+                        `Equation of Time: ${window.solarDetails.eqTime} minutes<br>
+                         Longitudinal Correction: ${window.solarDetails.lonCorrection} minutes<br>
+                         Elevation Correction: ${window.solarDetails.elevationCorrection} seconds<br>
+                         Atmospheric Refraction: ${window.solarDetails.refractionCorrection} seconds<br>
+                         Total Offset: ${window.solarDetails.totalOffset} seconds`;
+                }
+            }
+            
+            // Update alarm countdown
+            updateAlarmCountdown();
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', init);
+        
+        // Update coordinates when manually changed
+        document.getElementById('latitude').addEventListener('change', updateDisplay);
+        document.getElementById('longitude').addEventListener('change', updateDisplay);
+        document.getElementById('elevation').addEventListener('change', updateDisplay);
+        
+        // Auto-update when using custom coordinates
+        document.getElementById('latitude').addEventListener('change', useCustomCoordinates);
+        document.getElementById('longitude').addEventListener('change', useCustomCoordinates);
+        document.getElementById('elevation').addEventListener('change', useCustomCoordinates);
+    </script>
+</body>
+</html>
