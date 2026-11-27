@@ -558,7 +558,7 @@ function updatePanels(now, band, secs, nextIdx) {
   document.getElementById('bandLine').innerHTML =
     'It is exactly <b>16:20:00</b> at <b>' + fmtLon(band.west) + '</b> right now &mdash; the 16:20 minute spans <b>' +
     fmtLon(band.west) + '</b> to <b>' + fmtLon(east) + '</b>.';
-  document.getElementById('dBand').textContent = fmtLon(band.west) + ' → ' + fmtLon(east);
+  document.getElementById('dBand').textContent = fmtLon(band.west) + '–' + fmtLon(east);
   document.getElementById('dExact').textContent = fmtLon(band.west);
   document.getElementById('dEot').textContent = (eot >= 0 ? '+' : '') + eot.toFixed(2) + ' min (apparent − mean)';
   document.getElementById('dDecl').textContent = solarDeclinationDeg(now).toFixed(2) + '°';
