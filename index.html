@@ -455,7 +455,7 @@ function buildBackground(now) {
       const sinAlt = Math.sin(latR) * Math.sin(declR) + Math.cos(latR) * Math.cos(declR) * cosH;
       const alt = Math.asin(Math.max(-1, Math.min(1, sinAlt)));
       let a = 0;
-      if (alt < 0) a = Math.min(150, (-alt) * 480); // twilight ramp: 0 at terminator, full by ~-18 deg
+      if (alt < 0) a = Math.min(168, (-alt) * 520); // twilight ramp: 0 at terminator, full by ~-18 deg
       const k = (j * 360 + i) * 4;
       img.data[k] = 3; img.data[k + 1] = 5; img.data[k + 2] = 18; img.data[k + 3] = a;
     }
@@ -599,7 +599,7 @@ function updatePanels(now, band, secs, nextIdx) {
   const ago = 86400 - lastVal;
   document.getElementById('lastNext').innerHTML =
     'Most recent: <b>' + CITIES[lastIdx][0] + '</b> (' + fmtHMS(ago) + ' ago) · Next: <b>' +
-    CITIES[nextIdx][0] + '</b> (in ' + fmtHMS(nextVal) + ')';
+    CITIES[nextIdx][0] + '</b> (in ' + fmtHMS(secs[nextIdx]) + ')';
 
   const order = CITIES.map((c, i) => i).sort((a, b) => secs[a] - secs[b]).slice(0, 6);
   document.getElementById('nextList').innerHTML = order.map(i =>
@@ -623,6 +623,7 @@ canvas.addEventListener('click', ev => {
   you = { name: 'Custom point', lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100 };
   document.getElementById('latIn').value = you.lat;
   document.getElementById('lonIn').value = you.lon;
+  draw(new Date());
 });
 
 document.getElementById('btnSet').addEventListener('click', () => {
@@ -630,6 +631,7 @@ document.getElementById('btnSet').addEventListener('click', () => {
   const lon = parseFloat(document.getElementById('lonIn').value);
   if (isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
     you = { name: 'Custom place', lat, lon };
+    draw(new Date());
   }
 });
 document.getElementById('btnGeo').addEventListener('click', () => {
@@ -638,6 +640,7 @@ document.getElementById('btnGeo').addEventListener('click', () => {
     you = { name: 'Your location', lat: pos.coords.latitude, lon: pos.coords.longitude };
     document.getElementById('latIn').value = you.lat.toFixed(5);
     document.getElementById('lonIn').value = you.lon.toFixed(5);
+    draw(new Date());
   });
 });
 document.getElementById('btnApparent').addEventListener('click', () => setMode(true));
@@ -647,13 +650,14 @@ function setMode(apparent) {
   document.getElementById('btnApparent').classList.toggle('on', apparent);
   document.getElementById('btnMean').classList.toggle('on', !apparent);
   bgStamp = 0;
+  draw(new Date());
 }
 
 window.addEventListener('resize', resize);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) draw(new Date()); });
 resize();
-draw(new Date());
 setInterval(() => draw(new Date()), 250);
+draw(new Date());
 </script>
 </body>
 </html>
