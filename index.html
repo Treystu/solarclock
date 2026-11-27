@@ -232,14 +232,14 @@
             <div id="solarDetails">
                 Equation of Time: -- minutes<br>
                 Longitudinal Correction: -- minutes<br>
-                Elevation Correction: -- seconds<br>
-                Atmospheric Refraction: -- seconds<br>
+                Elevation Correction: not applied (horizon-only)<br>
+                Atmospheric Refraction: not applied (horizon-only)<br>
                 Total Offset: -- seconds
             </div>
         </div>
         
         <div class="accuracy-note">
-            Precision solar time calculation with elevation and atmospheric refraction corrections
+            Apparent solar time = UTC + longitude correction + Equation of Time (NOAA/Meeus solar-position method). Refraction and horizon dip affect sunrise/sunset only and are never added to the clock.
         </div>
     </div>
 
@@ -255,19 +255,6 @@
             alarmActive: false,
             alarmTimeout: null
         };
-        
-        // More precise EoT coefficients (Meeus Astronomical Algorithms)
-        const EOT_COEFFS = [
-            [0, 0, 0, 0, 1],
-            [-107.5, -108.9, -106.9, -106.3, -106.9],
-            [596.1, 596.2, 596.1, 596.2, 596.2],
-            [-4.4, -4.4, -4.4, -4.4, -4.4],
-            [12.0, 12.0, 12.0, 12.0, 12.0],
-            [-428.9, -429.8, -428.2, -427.4, -428.2],
-            [-2.1, -2.1, -2.1, -2.1, -2.1],
-            [19.8, 19.8, 19.8, 19.8, 19.8],
-            [-3.7, -3.7, -3.7, -3.7, -3.7]
-        ];
         
         // Initialize
         function init() {
@@ -291,25 +278,53 @@
             setInterval(updateDisplay, 1000);
         }
         
-        // More precise Equation of Time calculation (Meeus algorithm)
-        function preciseEquationOfTime(date) {
-            const year = date.getUTCFullYear();
-            const denom = isLeapYear(year) ? 366 : 365;
-            const doy = dayOfYear(date);
-            const hourFrac = (date.getUTCHours() - 12) / 24;
-            const gamma = (2 * Math.PI / denom) * (doy - 1 + hourFrac);
-            
-            // More precise calculation using Meeus coefficients
-            let eot = 0;
-            for (let i = 0; i < EOT_COEFFS.length; i++) {
-                const coeffs = EOT_COEFFS[i];
-                const j = Math.min(4, year - 2000);
-                eot += coeffs[j] * Math.sin(i * gamma);
-            }
-            
-            return eot / 60; // Convert to minutes
+        // Solar position (NOAA / Meeus method). Returns Equation of Time in
+        // minutes and solar declination in radians for the exact instant,
+        // computed from Julian centuries - no day-of-year tables, no
+        // fitted sine-only series.
+        function solarPosition(date) {
+            const julianDay = date.getTime() / 86400000 + 2440587.5;
+            const T = (julianDay - 2451545.0) / 36525; // Julian centuries since J2000.0
+            const deg = Math.PI / 180;
+
+            // Geometric mean longitude of the Sun (degrees)
+            let L0 = 280.46646 + T * (36000.76983 + 0.0003032 * T);
+            L0 = ((L0 % 360) + 360) % 360;
+            // Geometric mean anomaly (degrees)
+            const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
+            // Eccentricity of Earth's orbit
+            const e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);
+            // Sun's equation of center (degrees)
+            const C = Math.sin(M * deg) * (1.914602 - T * (0.004817 + 0.000014 * T))
+                    + Math.sin(2 * M * deg) * (0.019993 - 0.000101 * T)
+                    + Math.sin(3 * M * deg) * 0.000289;
+            // Apparent longitude (degrees), corrected for nutation / aberration
+            const omega = 125.04 - 1934.136 * T;
+            const lambda = (L0 + C) - 0.00569 - 0.00478 * Math.sin(omega * deg);
+            // Obliquity of the ecliptic, corrected (degrees)
+            const eps0 = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60;
+            const eps = eps0 + 0.00256 * Math.cos(omega * deg);
+
+            // Equation of Time (minutes): Meeus / NOAA GML formulation
+            const y = Math.pow(Math.tan((eps / 2) * deg), 2);
+            const eotRad = y * Math.sin(2 * L0 * deg)
+                - 2 * e * Math.sin(M * deg)
+                + 4 * e * y * Math.sin(M * deg) * Math.cos(2 * L0 * deg)
+                - 0.5 * y * y * Math.sin(4 * L0 * deg)
+                - 1.25 * e * e * Math.sin(2 * M * deg);
+            const eqTime = 4 * eotRad / deg; // radians -> degrees -> minutes of time (4 min/deg)
+
+            // Declination (radians)
+            const declination = Math.asin(Math.sin(eps * deg) * Math.sin(lambda * deg));
+
+            return { eqTime, declination };
         }
-        
+
+        // Equation of Time in minutes for the given instant
+        function preciseEquationOfTime(date) {
+            return solarPosition(date).eqTime;
+        }
+
         // Atmospheric refraction correction (Saemundsson formula)
         function atmosphericRefraction(solarAltitude, elevation) {
             if (solarAltitude < -0.5) return 0; // No refraction when sun is well below horizon
@@ -333,30 +348,21 @@
             return refraction * 240; // Rough conversion: 1° ≈ 4 minutes = 240 seconds
         }
         
-        // Solar altitude calculation (simplified)
+        // Solar altitude from the true declination and the EoT-corrected
+        // hour angle. Used for horizon / refraction work only - it is not
+        // part of the clock offset.
         function calculateSolarAltitude(date, lat, lon) {
-            // Simplified calculation - in a real implementation, this would be more complex
-            const year = date.getUTCFullYear();
-            const denom = isLeapYear(year) ? 366 : 365;
-            const doy = dayOfYear(date);
-            const hourFrac = (date.getUTCHours() + date.getUTCMinutes()/60 + date.getUTCSeconds()/3600);
-            
-            // Solar declination approximation
-            const declination = 0.4095 * Math.sin(2 * Math.PI / 365 * (doy - 81));
-            
-            // Hour angle
-            const timeOffset = (lon / 15) * 60; // minutes
-            const solarTime = hourFrac + timeOffset/60;
-            const hourAngle = (solarTime - 12) * 15 * (Math.PI / 180);
-            
-            // Solar altitude
+            const { eqTime, declination } = solarPosition(date);
+            const utcMin = date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60;
+            const apparentSolarMin = utcMin + (lon / 15) * 60 + eqTime;
+            // Hour angle: 0 deg at apparent solar noon, 15 deg per hour
+            const hourAngle = ((apparentSolarMin / 4) - 180) * (Math.PI / 180);
             const latRad = lat * (Math.PI / 180);
-            const sinAlt = Math.sin(latRad) * Math.sin(declination) + 
+            const sinAlt = Math.sin(latRad) * Math.sin(declination) +
                           Math.cos(latRad) * Math.cos(declination) * Math.cos(hourAngle);
-            
-            return Math.asin(sinAlt);
+            return Math.asin(Math.max(-1, Math.min(1, sinAlt)));
         }
-        
+
         // Enhanced solar time calculation with all corrections
         function apparentSolarTime(lat, lon, elevation, date) {
             if (!lon || !lat) return { hour: '--', min: '--', sec: '--' };
@@ -365,15 +371,13 @@
             const eqtime = preciseEquationOfTime(date);
             const lonCorrection = (lon / 15) * 60; // minutes
             
-            // Calculate solar altitude for refraction correction
-            const solarAlt = calculateSolarAltitude(date, lat, lon);
-            const refractionCorrection = atmosphericRefraction(solarAlt, elevation) / 60; // minutes
-            
-            // Elevation correction (simplified - affects apparent sunrise/sunset times)
-            const elevationCorrection = (elevation > 0) ? 
-                (0.035 * Math.sqrt(elevation)) / 60 : 0; // minutes
-            
-            let totalOffsetMin = lonCorrection + eqtime + refractionCorrection + elevationCorrection;
+            // Refraction and elevation horizon dip change when the Sun
+            // appears to cross the horizon (sunrise/sunset). They are NOT
+            // clock corrections and are not added to solar time.
+            const refractionCorrection = 0; // minutes - horizon-only, not applied
+            const elevationCorrection = 0; // minutes - horizon-only, not applied
+
+            let totalOffsetMin = lonCorrection + eqtime;
             let utcTotalMin = date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60;
             let solarTotalMin = (utcTotalMin + totalOffsetMin) % 1440;
             
@@ -410,7 +414,7 @@
             const current = Date.UTC(year, date.getUTCMonth(), date.getUTCDate());
             const diff = current - start;
             const oneDay = 1000 * 60 * 60 * 24;
-            return Math.floor(diff / oneDay) + 1;
+            return Math.floor(diff / oneDay);
         }
         
         // Location management
@@ -626,8 +630,8 @@
                     document.getElementById('solarDetails').innerHTML = 
                         `Equation of Time: ${window.solarDetails.eqTime} minutes<br>
                          Longitudinal Correction: ${window.solarDetails.lonCorrection} minutes<br>
-                         Elevation Correction: ${window.solarDetails.elevationCorrection} seconds<br>
-                         Atmospheric Refraction: ${window.solarDetails.refractionCorrection} seconds<br>
+                         Elevation Correction: not applied (horizon-only)<br>
+                         Atmospheric Refraction: not applied (horizon-only)<br>
                          Total Offset: ${window.solarDetails.totalOffset} seconds`;
                 }
             }
