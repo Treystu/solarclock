@@ -116,7 +116,7 @@
 <div class="wrap">
   <header>
     <h1>It&rsquo;s <span class="t">16:20</span> Somewhere</h1>
-    <p class="tagline">The live band of Earth where the sun says 4:20 PM &mdash; sweeping west at 15&deg; an hour.</p>
+    <p class="tagline">The live band of Earth where the sun says 4:20 PM &mdash; sweeping west at about 15&deg; an hour.</p>
     <div class="chips">
       <span class="chip">UTC <b id="utcClock">--:--:--</b></span>
       <span class="chip">Equation of Time <b id="eotChip">--</b></span>
@@ -172,7 +172,8 @@
         <dt>Band (the 16:20 minute)</dt><dd id="dBand">--</dd>
         <dt>Exactly 16:20:00 at</dt><dd id="dExact">--</dd>
         <dt>Band width</dt><dd>0.25&deg; of longitude &mdash; one minute of time</dd>
-        <dt>Band speed</dt><dd>15&deg;/hour westward &mdash; a place is inside for 60 s</dd>
+        <dt>Band speed</dt><dd>About 15&deg;/hour westward &mdash; exactly 15&deg;/hour in Mean mode</dd>
+        <dt>Time in the band</dt><dd>About 60 seconds &mdash; exactly 60 s in Mean mode</dd>
         <dt>Equation of Time</dt><dd id="dEot">--</dd>
         <dt>Solar declination</dt><dd id="dDecl">--</dd>
         <dt>Definition</dt><dd id="dDef">Apparent solar time</dd>
@@ -181,18 +182,24 @@
   </div>
 
   <footer>
-    <p><b>What you are looking at.</b> The amber band is every longitude where solar time is in the
-    minute 16:20:00&ndash;16:20:59. Its bright west edge is the meridian where it is <i>exactly</i>
-    16:20:00 right now. Solar time here is <b>apparent solar time</b> by default &mdash; UTC plus
-    4 minutes per degree of longitude plus the Equation of Time &mdash; the time a sundial reads.
-    Switch to Mean to drop the Equation of Time term and watch the band jump by today&rsquo;s
-    EoT&nbsp;&times;&nbsp;0.25&deg;. Night shading and the sun marker always follow the real sun.</p>
+    <p><b>What you are looking at.</b> It&rsquo;s 16:20 Somewhere tracks the band where modeled
+    apparent solar time reads 16:20 and estimates when it reaches each listed city. The amber band
+    is every longitude where solar time is in the minute 16:20:00&ndash;16:20:59. Its bright west
+    edge is the meridian where it is <i>exactly</i> 16:20:00 right now. Solar time here is
+    <b>apparent solar time</b> by default &mdash; UTC plus 4 minutes per degree of longitude plus
+    the Equation of Time &mdash; the time a sundial reads. Switch to Mean to drop the Equation of
+    Time term and watch the band jump by today&rsquo;s EoT&nbsp;&times;&nbsp;0.25&deg;. Night
+    shading and the sun marker always follow the real sun. The band continues across the date
+    line. 16:20 is local solar time &mdash; your civil clock may show another time, and daylight
+    saving does not move the band. Solar time reaches 16:20 at every latitude, even where the sun
+    stays below or above the horizon all day.</p>
     <p><b>Precision, honestly.</b> The solar position is computed from Julian centuries (the
     NOAA/Meeus method &mdash; the same code as the accuracy-fixed solarclock), and its Equation of
     Time is good to a few seconds against published values: it reproduces the published 2026
     extremes, &minus;14.2 min on Feb 11 and +16.5 min on Nov 3, to within about 0.03 min, so the
     band&rsquo;s position is good to about 0.01&deg;. City coordinates are good to about 0.1&deg;, so
-    city arrival times carry about &plusmn;25 seconds. Everything runs off your device
+    city arrival times carry about &plusmn;25 seconds &mdash; almost all of it from the coordinates;
+    the Equation of Time itself contributes only a couple of seconds. Everything runs off your device
     clock &mdash; if your clock is off, the band is off by the same amount. Land: Natural Earth.
     A remake of the Tesla Solar Clock (Treystu/solarclock), whose original Equation of Time ran
     up to ~31 minutes off; this one is measured, not asserted.</p>
@@ -643,6 +650,7 @@ function setMode(apparent) {
 }
 
 window.addEventListener('resize', resize);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) draw(new Date()); });
 resize();
 draw(new Date());
 setInterval(() => draw(new Date()), 250);
