@@ -1,49 +1,72 @@
-# Accuracy — It's 16:20 Somewhere
+# Accuracy — It's 16:20 Somewhere (v2, Julian-centuries method)
 
 ## Method
 Apparent solar time = UTC + longitude × 4 min/° + Equation of Time.
-Equation of Time and solar declination: NOAA's published fractional-year
-series (the GML solar calculator formulas), implemented in `solar.js`
-(inlined byte-identical into `index.html` by `build.py`). No refraction or
-elevation clock terms — those affect sunrise/sunset, not the time of day
-(the original build added them as constant offsets; that was one of its
-defects).
+The Equation of Time and declination come from `solarPosition()` — the
+NOAA / Meeus solar-position computation from Julian centuries (geometric
+mean longitude and anomaly, equation of center, apparent longitude,
+corrected obliquity) — copied verbatim from the accuracy-fixed
+Treystu/solarclock (commit 74d6ffc) into `solar.js`, and inlined
+byte-identical into `index.html` by `build.py`. EoT is recomputed from
+the exact instant on every redraw — no fractional-year fit, no
+day-of-year table, no cached values. No refraction or elevation clock
+terms: those affect sunrise/sunset, not the time of day.
 
-## Why the original was replaced
-Astra verification (GPT-6.2 Astra, 2026-11-27) of the original
-"Tesla Solar Clock" at commit abd1ace: **INACCURATE — 18.1 minutes slow**
-at the Pāhoa defaults on 2026-11-27 (displayed 11:39:46 vs true ~11:57:53).
-Its Equation of Time matched 0 of 6 NOAA reference dates within ±1 min
-(worst −30.8 min, Nov 3; wrong sign in Feb and Nov), its day-of-year ran
-+1 all year, and its refraction/elevation terms were physically wrong as
-constant clock corrections. Longitude assembly was accurate.
+## Anchors — shipped EoT vs published values
+| Check | Shipped code | Reference | Δ |
+|---|---|---|---|
+| EoT 2026-02-11 12:00Z | −14.226 min | −14.2 min (published 2026 minimum, solarposition.org) | 0.03 min |
+| EoT 2026-11-03 12:00Z | +16.492 min | +16.5 min (published 2026 maximum, solarposition.org) | 0.01 min |
+| EoT 2026-11-27 22:05:43Z | +12.251 min | — | — |
+| Apparent solar time, Pāhoa (lon −154.944005) at 2026-11-27T22:05:43Z | 11:58:11 | 11:58:11 (fixed solarclock, same instant) | 0 s |
 
-## Test table — shipped EoT vs NOAA reference (12:00Z, `node test-solar.js`)
-| Date | EoT code (min) | EoT NOAA (min) | Error (min) | Decl. error (°) |
-|---|---|---|---|---|
-| 2026-01-01 | −2.90 | −2.90 | 0.00 | 0.00 |
-| 2026-02-11 | −14.20 | −14.20 | 0.00 | 0.00 |
-| 2026-03-20 | −8.16 | −8.16 | 0.00 | 0.00 |
-| 2026-06-21 | −1.33 | −1.33 | 0.00 | 0.00 |
-| 2026-11-03 | +16.37 | +16.37 | 0.00 | 0.00 |
-| 2026-11-27 | +12.08 | +11.94 | +0.14 | +0.07 |
+The shipped EoT is bit-identical to the fixed solarclock's (max diff
+0.0 min over 8 sampled instants) — the copy is exact, and the fixed
+solarclock's EoT was itself verified against an independently written
+implementation of the same method to 0.0000 s over 54 samples.
 
-Worst EoT error: **0.14 min** ≈ 8 s of time ≈ 0.035° of band position.
-Full-path check at the Astra test instant (2026-11-27T22:05:43Z, lon
-−154.944005): shipped code gives apparent solar time **11:57:53**, matching
-the reference to the second.
+## Inversion test — the band, judged by the fixed page's own clock
+Probe longitudes were run through the fixed solarclock's own
+`apparentSolarTime` (lat 19.442640, elev 330). λ\* is the rendered
+band's west edge (the exact 16:20:00 line); offsets are degrees east
+of λ\* (solar time increases eastward, so the 16:20 minute unfolds
+east of the line):
 
-## Cold run of the shipped file
-The solar code was extracted back out of the built `index.html`, confirmed
-byte-identical to the tested `solar.js`, and at six instants (including the
-year boundary and 2028-02-29) in both apparent and mean modes the solar
-time at the band's west edge is exactly 16:20:00 and at its east edge
-exactly 16:21:00. An independent Python implementation of the same NOAA
-formulas reproduces the band west edge to 0.0000° on all six instants.
+| Offset | 2026-11-27T22:05:43Z (λ\*=−89.4919°) | 2026-06-21T03:00:00Z (λ\*=−159.5643°) | 2026-02-11T18:30:00Z (λ\*=−28.9437°) |
+|---|---|---|---|
+| −0.010° (just west, outside) | 16:19:57 | 16:19:57 | 16:19:57 |
+| −0.001° (just west, outside) | 16:19:59 | 16:19:59 | 16:19:59 |
+| 0.000° (the line) | 16:20:00 | 16:19:59 | 16:20:00 |
+| +0.0625° | 16:20:15 | 16:20:14 | 16:20:15 |
+| +0.125° (band centre) | 16:20:30 | 16:20:29 | 16:20:30 |
+| +0.1875° | 16:20:45 | 16:20:44 | 16:20:45 |
+| +0.249° (inner east edge) | 16:20:59 | 16:20:59 | 16:20:59 |
+| +0.251° (just east, outside) | 16:21:00 | 16:21:00 | 16:21:00 |
+| +0.260° | 16:21:02 | 16:21:02 | 16:21:02 |
+
+Inside reads 16:20:xx, just outside reads 16:19:59 / 16:21:00, as
+specified. Two honest blemishes, both in the reference display, not the
+geometry: at the June instant the at-the-line probe reads 16:19:59 and
+the interior probes read one second low — a sub-second floating-point
+artifact surfaced by the fixed page's floor-to-second display (its
+continuous value at the line is 16:20:00.0). Readings are identical at
+latitudes 19.44, −33.87, and 64.15 — solar time is latitude-independent,
+as it must be.
+
+## Correction of the v1 record
+Version 1 of this build used NOAA's fractional-year EoT fit and reported
+a worst error of 0.14 min **against fractional-year reference values**.
+That framing was superseded the same day: measured across 2026, the
+fractional-year fit itself deviates from the Julian-centuries method by
+up to **47.1 s** (max on 2026-01-12). The published 2026 values side
+with the Julian-centuries method, which is why v2 ships it. The v1
+numbers were accurate relative to their stated references; they are not
+the accuracy of this build and should not be quoted for it.
 
 ## Honest limits
-- Page label: EoT good to ~0.2 min (~3 s of band passage, ~0.05°).
+- "Perfect" here means: a second-level display on a method good to a
+  few seconds against published values. Not zero error.
 - Embedded city coordinates are good to ~0.1°, so city arrival times
   carry ~±25 s.
-- The page runs on the viewer's device clock; a wrong device clock shifts
-  the band by the same amount.
+- The page runs on the viewer's device clock; a wrong device clock
+  shifts the band by the same amount.
